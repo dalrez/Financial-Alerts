@@ -4,6 +4,11 @@ import yfinance as yf
 from datetime import datetime
 from src.notify_whatsapp import send_whatsapp
 
+UNIVERSES = {
+    "IBEX35": "data/tickers.csv",
+    "NASDAQ100": "data/tickers_nasdaq100.csv",
+}
+
 def load_tickers(path="data/tickers.csv"):
     df = pd.read_csv(path)
     tickers = df["Ticker"].dropna().astype(str).str.strip()
@@ -55,24 +60,33 @@ def compute_under_sma200(px):
     return under[["RunDate", "Ticker", "AdjClose", "SMA200", "PctBelow"]]
 
 def main():
-    tickers = load_tickers("data/tickers.csv")
-    raw = download_prices(tickers)
-    px = to_long_format(raw)
-    under = compute_under_sma200(px)
-
     os.makedirs("data", exist_ok=True)
-    under.to_csv("data/under_sma200.csv", index=False)
 
-        # Mensaje diario WhatsApp (corto)
-    if under.empty:
-        msg = "IBEX: hoy no hay empresas bajo SMA200."
+    all_under = []
+
+    for name, path in UNIVERSES.items():
+        tickers = load_tickers(path)
+        raw = download_prices(tickers)
+        px = to_long_format(raw)
+        under = compute_under_sma200(px)
+
+        under["Universe"] = name
+        under.to_csv(f"data/under_sma200_{name}.csv", index=False)
+        all_under.append(under)
+
+        print(f"{name}: {len(under)} empresas bajo SMA200")
+
+    combined = pd.concat(all_under, ignore_index=True) if all_under else pd.DataFrame()
+    combined.to_csv("data/under_sma200_all.csv", index=False)
+
+    # WhatsApp: resumen combinado
+    if combined.empty:
+        msg = "Universos (IBEX + Nasdaq100): hoy no hay empresas bajo SMA200."
     else:
-        top = under.sort_values("PctBelow").head(10)
-        lines = [f"IBEX: {len(under)} empresas bajo SMA200 (Top 10):"]
+        lines = [f"Universos: {len(combined)} empresas bajo SMA200 (Top 10 por %):"]
+        top = combined.sort_values("PctBelow").head(10)
         for _, r in top.iterrows():
-            lines.append(
-                f"- {r['Ticker']}: {r['AdjClose']:.2f} | SMA200 {r['SMA200']:.2f} | {r['PctBelow']:.2f}%"
-            )
+            lines.append(f"- {r['Universe']} {r['Ticker']}: {r['PctBelow']:.2f}%")
         msg = "\n".join(lines)
 
     try:
@@ -81,12 +95,6 @@ def main():
     except Exception as e:
         print("⚠️ No se pudo enviar WhatsApp, pero el proceso continúa.")
         print(f"Detalle del error: {e}")
-
-    if under.empty:
-        print("Hoy NO hay empresas bajo SMA200 (según la lista del fichero).")
-    else:
-        print("Empresas bajo SMA200:")
-        print(under.to_string(index=False))
    
 
 if __name__ == "__main__":
