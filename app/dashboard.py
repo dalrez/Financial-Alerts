@@ -4,9 +4,19 @@ import plotly.express as px
 import os
 from datetime import datetime
 
-ts = os.path.getmtime(PATH)
-st.caption("Última actualización: " + datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S"))
+PATH = "data/under_sma200_all.csv"
 
+# Info de última actualización (si existe el fichero)
+import os
+from datetime import datetime
+
+if os.path.exists(PATH):
+    ts = os.path.getmtime(PATH)
+    st.caption("Última actualización del dataset: " + datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S"))
+else:
+    st.caption("Última actualización del dataset: (aún no existe)")
+
+# Botón de recarga
 if st.button("Recargar datos"):
     st.experimental_rerun()
 
