@@ -7,6 +7,7 @@ from src.notify_whatsapp import send_whatsapp
 UNIVERSES = {
     "IBEX35": "data/tickers.csv",
     "NASDAQ100": "data/tickers_nasdaq100.csv",
+    "INDICES": "data/tickers_indices.csv",
 }
 
 def load_tickers(path="data/tickers.csv"):
