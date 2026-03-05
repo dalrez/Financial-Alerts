@@ -24,6 +24,10 @@ if "Universe" in df.columns:
         df = df[df["Universe"] == universe].copy()
 else:
     universe = "Todos"
+    
+# --- Slider para el % ---
+threshold = st.sidebar.slider("Umbral (% bajo SMA200)", min_value=-30, max_value=5, value=-5, step=1)
+df = df[df["PctBelow"] <= threshold].copy()
 
 # --- Limpieza / tipos (solo si existen) ---
 for col in ["AdjClose", "SMA200", "DeltaToSMA200", "PctBelow",
