@@ -21,7 +21,7 @@ if st.button("Recargar datos"):
     st.rerun()
 
 st.set_page_config(page_title="SMA200 - Universos", layout="wide")
-st.title("Valores destacados por Media Semanal de los ultimos 200 días")
+st.title("Valores destacados por Media Semanal de los últimos 200 días")
 
 PATH = "data/under_sma200_all.csv"
 
