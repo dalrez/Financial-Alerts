@@ -2,6 +2,7 @@ import os
 import pandas as pd
 import yfinance as yf
 from datetime import datetime
+from src.notify_whatsapp import send_whatsapp
 
 def load_tickers(path="data/tickers.csv"):
     df = pd.read_csv(path)
@@ -61,6 +62,21 @@ def main():
 
     os.makedirs("data", exist_ok=True)
     under.to_csv("data/under_sma200.csv", index=False)
+
+        # Mensaje diario WhatsApp (corto)
+    if under.empty:
+        msg = "IBEX: hoy no hay empresas bajo SMA200."
+    else:
+        top = under.sort_values("PctBelow").head(10)
+        lines = [f"IBEX: {len(under)} empresas bajo SMA200 (Top 10):"]
+        for _, r in top.iterrows():
+            lines.append(
+                f"- {r['Ticker']}: {r['AdjClose']:.2f} | SMA200 {r['SMA200']:.2f} | {r['PctBelow']:.2f}%"
+            )
+        msg = "\n".join(lines)
+
+    send_whatsapp(msg)
+    print("WhatsApp enviado.")
 
     if under.empty:
         print("Hoy NO hay empresas bajo SMA200 (según la lista del fichero).")
