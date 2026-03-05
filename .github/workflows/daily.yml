@@ -26,9 +26,9 @@ jobs:
         run: |
           pip install -r requirements.txt
 
-      - name: Update IBEX tickers
+      - name: Update tickers (IBEX + Nasdaq100)
         run: |
-          python src/update_tickers.py
+          python src/update_universe.py
 
       - name: Run daily script
         env:
