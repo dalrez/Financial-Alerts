@@ -3,14 +3,12 @@ import pandas as pd
 import yfinance as yf
 from datetime import datetime
 
-# Lista inicial (simplificada). Luego la automatizamos con la lista real del IBEX.
-# Estos tickers son ejemplos en Yahoo Finance para España (suelen acabar en .MC).
-TICKERS = [
-    "ABE.MC","ACX.MC","AENA.MC","AMS.MC","ANA.MC","BBVA.MC","BKT.MC","CABK.MC","CLNX.MC",
-    "COL.MC","ELE.MC","ENG.MC","FER.MC","FLUI.MC","GRF.MC","IAG.MC","IBE.MC","IDR.MC",
-    "ITX.MC","LOG.MC","MAP.MC","MEL.MC","MRL.MC","NTGY.MC","PHM.MC","RED.MC","REP.MC",
-    "ROVI.MC","SAN.MC","SGRE.MC","SLR.MC","TEF.MC","UNI.MC"
-]
+def load_tickers(path="data/tickers.csv"):
+    df = pd.read_csv(path)
+    tickers = df["Ticker"].dropna().astype(str).str.strip()
+    # Quitar líneas vacías
+    tickers = [t for t in tickers if t]
+    return tickers
 
 def download_prices(tickers):
     # Bajamos ~400 días para tener margen de 200 sesiones
@@ -56,20 +54,20 @@ def compute_under_sma200(px):
     return under[["RunDate", "Ticker", "AdjClose", "SMA200", "PctBelow"]]
 
 def main():
-    raw = download_prices(TICKERS)
+    tickers = load_tickers("data/tickers.csv")
+    raw = download_prices(tickers)
     px = to_long_format(raw)
     under = compute_under_sma200(px)
-    os.makedirs("data",exist_ok=True)
 
-    # Guardamos CSV para que el dashboard lo lea
+    os.makedirs("data", exist_ok=True)
     under.to_csv("data/under_sma200.csv", index=False)
 
-    # También guardamos un resumen para ver rápido en logs
     if under.empty:
-        print("Hoy NO hay empresas bajo SMA200 (en la lista de ejemplo).")
+        print("Hoy NO hay empresas bajo SMA200 (según la lista del fichero).")
     else:
         print("Empresas bajo SMA200:")
         print(under.to_string(index=False))
+   
 
 if __name__ == "__main__":
     main()
