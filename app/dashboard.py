@@ -170,15 +170,25 @@ with tab2:
 
     # Hover template: usa customdata en el mismo orden que hover_cols
     lines = ["<b>%{y}</b>", "Pct vs SMA200: %{x:.2f}%"]
+    nice = {
+        "AdjClose": "Precio",
+        "SMA200": "SMA200",
+        "DeltaToSMA200": "Δ vs SMA200",
+        "Return_5d": "Ret 5d",
+        "Return_21d": "Ret 21d",
+        "Return_63d": "Ret 63d",
+        "Vol_20d": "Vol 20d (anual)",
+    }
+    
     for i, col in enumerate(hover_cols):
+        label = nice.get(col, col)
         if col in ["AdjClose", "SMA200", "DeltaToSMA200"]:
-            lines.append(f"{col}: %{{customdata[{i}]:.2f}}")
+            lines.append(f"{label}: %{{customdata[{i}]:.2f}}")
         elif col in ["Return_5d", "Return_21d", "Return_63d", "Vol_20d"]:
-            # returns/vol son decimales: 0.05 -> 5.00%
-            label = col.replace("Return_", "Ret ").replace("Vol_20d", "Vol 20d (anual)")
+            # decimales: 0.05 -> 5.00%
             lines.append(f"{label}: %{{customdata[{i}]:.2%}}")
         else:
-            lines.append(f"{col}: %{{customdata[{i}]}}")
+            lines.append(f"{label}: %{{customdata[{i}]}}")
 
     fig.update_traces(hovertemplate="<br>".join(lines) + "<extra></extra>")
 
