@@ -1,7 +1,8 @@
 pandas
-yfinance
 numpy
-streamlit>=1.23
+yfinance
 plotly
+streamlit>=1.23
 altair<5
+requests
 lxml
