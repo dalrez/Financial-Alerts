@@ -6,7 +6,10 @@ from datetime import datetime
 # Lista inicial (simplificada). Luego la automatizamos con la lista real del IBEX.
 # Estos tickers son ejemplos en Yahoo Finance para España (suelen acabar en .MC).
 TICKERS = [
-    "SAN.MC", "BBVA.MC", "ITX.MC", "IBE.MC", "TEF.MC"
+    "ABE.MC","ACX.MC","AENA.MC","AMS.MC","ANA.MC","BBVA.MC","BKT.MC","CABK.MC","CLNX.MC",
+    "COL.MC","ELE.MC","ENG.MC","FER.MC","FLUI.MC","GRF.MC","IAG.MC","IBE.MC","IDR.MC",
+    "ITX.MC","LOG.MC","MAP.MC","MEL.MC","MRL.MC","NTGY.MC","PHM.MC","RED.MC","REP.MC",
+    "ROVI.MC","SAN.MC","SGRE.MC","SLR.MC","TEF.MC","UNI.MC"
 ]
 
 def download_prices(tickers):
