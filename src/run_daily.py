@@ -1,4 +1,5 @@
 import os
+import numpy as np
 import pandas as pd
 import yfinance as yf
 from datetime import datetime
@@ -45,20 +46,73 @@ def to_long_format(df):
     out = out.dropna()
     return out
 
-def compute_under_sma200(px):
-    px = px.sort_values(["Ticker", "Date"])
-    px["SMA200"] = px.groupby("Ticker")["AdjClose"].transform(lambda s: s.rolling(200).mean())
+def compute_under_sma200(px: pd.DataFrame) -> pd.DataFrame:
+    # Espera columnas: Date, Ticker, AdjClose
+    px = px.sort_values(["Ticker", "Date"]).copy()
 
-    last = px.groupby("Ticker").tail(1).copy()
+    g = px.groupby("Ticker", group_keys=False)
+
+    # Retorno diario
+    px["Ret"] = g["AdjClose"].pct_change()
+
+    # SMA200
+    px["SMA200"] = g["AdjClose"].transform(lambda s: s.rolling(200).mean())
+
+    # Retornos recientes
+    px["Return_5d"] = g["AdjClose"].pct_change(5)
+    px["Return_21d"] = g["AdjClose"].pct_change(21)
+    px["Return_63d"] = g["AdjClose"].pct_change(63)
+
+    # Volatilidad 20d (anualizada)
+    px["Vol_20d"] = g["Ret"].transform(lambda s: s.rolling(20).std() * np.sqrt(252))
+
+    # 52 semanas ~ 252 sesiones
+    px["52wHigh"] = g["AdjClose"].transform(lambda s: s.rolling(252).max())
+    px["52wLow"] = g["AdjClose"].transform(lambda s: s.rolling(252).min())
+
+    px["PctFrom52wHigh"] = (px["AdjClose"] / px["52wHigh"] - 1.0) * 100
+    px["PctFrom52wLow"] = (px["AdjClose"] / px["52wLow"] - 1.0) * 100
+
+    # Pendiente SMA200: % cambio en 20 sesiones
+    px["SMA200_Slope_20d"] = g["SMA200"].transform(lambda s: s.pct_change(20) * 100)
+
+    # Último registro por ticker
+    last = g.tail(1).copy()
+
+    # Delta / % bajo SMA200
+    last["DeltaToSMA200"] = last["AdjClose"] - last["SMA200"]
     last["BelowSMA200"] = last["AdjClose"] < last["SMA200"]
     last["PctBelow"] = (last["AdjClose"] / last["SMA200"] - 1.0) * 100
 
-    under = last[last["BelowSMA200"]].copy()
-    under = under.sort_values("PctBelow")  # más negativo = más por debajo
+    # WeeklyMean: media semanal reciente (sobre últimas 200 sesiones)
+    last200 = g.tail(200).copy()
+    last200 = last200.set_index("Date")
+    weekly = (
+        last200.groupby("Ticker")["AdjClose"]
+        .resample("W-FRI")
+        .mean()
+        .rename("WeeklyMean")
+        .reset_index()
+    )
+    weekly_last = weekly.groupby("Ticker").tail(1)[["Ticker", "WeeklyMean"]]
+    last = last.merge(weekly_last, on="Ticker", how="left")
 
-    # Output amigable
-    under["RunDate"] = datetime.utcnow().strftime("%Y-%m-%d")
-    return under[["RunDate", "Ticker", "AdjClose", "SMA200", "PctBelow"]]
+    # Nos quedamos solo con los que están bajo SMA200
+    under = last[last["BelowSMA200"]].copy()
+    under = under.sort_values("PctBelow")  # más negativo primero
+
+    # Columnas finales (ordenadas)
+    cols = [
+        "Ticker", "AdjClose", "SMA200", "DeltaToSMA200", "PctBelow",
+        "WeeklyMean",
+        "Return_5d", "Return_21d", "Return_63d",
+        "Vol_20d",
+        "52wHigh", "52wLow", "PctFrom52wHigh", "PctFrom52wLow",
+        "SMA200_Slope_20d",
+    ]
+    # Algunas pueden no existir si algo cambia; por seguridad:
+    cols = [c for c in cols if c in under.columns]
+    return under[cols]
 
 def main():
     os.makedirs("data", exist_ok=True)
