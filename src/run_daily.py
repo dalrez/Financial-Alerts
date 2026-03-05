@@ -143,7 +143,7 @@ def main():
         # Conteo por universo
         counts = combined.groupby("Universe")["Ticker"].count().sort_values(ascending=False)
 
-        lines = ["📉 Señal SMA200 (todos los universos)"]
+        lines = ["📉 Señal SMA200 (≤ {THRESHOLD_PCT:.0f}%) — resumen por universo:"]
         lines.append("Resumen: https://ib35insights.streamlit.app/#ibex-35-empresas-bajo-sma-200")
         for uni, n in counts.items():
             lines.append(f"- {uni}: {n}")
@@ -151,7 +151,7 @@ def main():
         # Top global (más por debajo)
         top = combined.sort_values("PctBelow").head(10)
         lines.append("")
-        lines.append("Top 10 global (% bajo SMA200):")
+        lines.append("Top 10 global:")
         for _, r in top.iterrows():
             lines.append(f"- {r['Universe']} {r['Ticker']}: {r['PctBelow']:.2f}%")
 
