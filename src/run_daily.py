@@ -82,8 +82,10 @@ def compute_under_sma200(px: pd.DataFrame) -> pd.DataFrame:
 
     # Delta / % bajo SMA200
     last["DeltaToSMA200"] = last["AdjClose"] - last["SMA200"]
-    last["BelowThreshold"] = last["PctBelow"] < THRESHOLD_PCT
     last["PctBelow"] = (last["AdjClose"] / last["SMA200"] - 1.0) * 100
+    
+    last["BelowThreshold"] = last["PctBelow"] < THRESHOLD_PCT
+
 
     # WeeklyMean: media semanal reciente (sobre últimas 200 sesiones)
     last200 = g.tail(200).copy()
