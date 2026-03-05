@@ -28,7 +28,7 @@ jobs:
 
       - name: Update tickers (IBEX + Nasdaq100)
         run: |
-          python src/update_universe.py
+          python src/update_universes.py
 
       - name: Run daily script
         env:
