@@ -26,12 +26,27 @@ df["PctBelow"] = pd.to_numeric(df["PctBelow"], errors="coerce")
 df = df.dropna(subset=["PctBelow"]).copy()
 df = df.sort_values("PctBelow")  # más negativo primero
 
+# columnas clave para mostrar (ajústalo a tu gusto)
+cols_show = [
+    "RunDate", "Universe", "Ticker",
+    "AdjClose", "SMA200", "DeltaToSMA200", "PctBelow",
+    "Return_21d", "Return_63d", "Vol_20d",
+    "PctFrom52wLow", "PctFrom52wHigh",
+    "SMA200_Slope_20d",
+]
+cols_show = [c for c in cols_show if c in df.columns]
+show = df[cols_show].copy()
+
 # KPIs
 c1, c2, c3 = st.columns(3)
 c1.metric("Empresas bajo SMA200", f"{len(df)}")
 c2.metric("Peor % vs SMA200", f"{df['PctBelow'].min():.2f}%")
 c3.metric("Mejor % (menos bajo)", f"{df['PctBelow'].max():.2f}%")
-
+c4, c5 = st.columns(2)
+if "Return_21d" in df.columns:
+    c4.metric("Media retorno 1 mes (21d)", f"{df['Return_21d'].mean()*100:.2f}%")
+if "Vol_20d" in df.columns:
+    c5.metric("Volatilidad mediana (20d)", f"{df['Vol_20d'].median()*100:.2f}%")
 st.divider()
 
 # Tabla y gráfico
