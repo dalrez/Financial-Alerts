@@ -1,1 +1,39 @@
+name: Daily IBEX Scan
 
+on:
+  workflow_dispatch:
+  schedule:
+    # Cron en GitHub Actions es UTC.
+    # Esto ejecuta L-V a las 17:30 UTC (aprox. 18:30/19:30 en España según horario).
+    - cron: "30 17 * * 1-5"
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run daily script
+        run: |
+          python src/run_daily.py
+
+      - name: Commit updated CSV
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add data/under_sma200.csv
+          git commit -m "Daily update" || echo "No changes"
+          git push
