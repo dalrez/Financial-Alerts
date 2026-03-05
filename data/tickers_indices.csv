@@ -1,12 +1,12 @@
-Ticker
-^IBEX
-^NDX
-^GSPC
-^DJI
-^IXIC
-^FTSE
-^N225
-^STOXX50E
-^HSI
-MCHI
-^MERV
+Ticker,Name
+^IBEX,IBEX 35
+^NDX,Nasdaq 100
+^GSPC,S&P 500
+^DJI,Dow Jones Industrial Average
+^IXIC,Nasdaq Composite
+^FTSE,FTSE 100
+^N225,Nikkei 225
+^STOXX50E,EURO STOXX 50
+^HSI,Hang Seng Index
+MCHI,MSCI China
+^MERV,MERVAL
