@@ -26,6 +26,10 @@ jobs:
         run: |
           pip install -r requirements.txt
 
+      - name: Update IBEX tickers
+        run: |
+          python src/update_tickers.py
+
       - name: Run daily script
         run: |
           python src/run_daily.py
