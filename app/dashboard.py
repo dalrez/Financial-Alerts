@@ -82,7 +82,7 @@ if top_n != "Todos" and len(df) > int(top_n):
 
 # --- Columnas a mostrar ---
 basic_cols = [
-    "RunDate", "Universe", "Ticker",
+    "RunDate", "Universe", "Ticker","Name",
     "AdjClose", "SMA200", "DeltaToSMA200", "PctBelow",
     "Return_21d", "Vol_20d",
 ]
@@ -168,6 +168,10 @@ with tab2:
 
     topn = min(15, len(df))
     dplot = df.sort_values("PctBelow").head(topn).copy()
+    dplot["Display"] = dplot.apply(
+    lambda r: f"{r['Ticker']} — {r['Name']}" if "Name" in dplot.columns and str(r.get("Name", "")).strip() else str(r["Ticker"]),
+    axis=1
+)
 
     # Hover: elegimos columnas disponibles
     hover_cols = [c for c in ["AdjClose", "SMA200", "DeltaToSMA200", "Return_5d", "Return_21d", "Return_63d", "Vol_20d"]
@@ -176,7 +180,7 @@ with tab2:
     fig = px.bar(
         dplot,
         x="PctBelow",
-        y="Ticker",
+        y="Display",
         orientation="h",
         text="PctBelow",
         hover_data=hover_cols,
