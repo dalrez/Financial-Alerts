@@ -10,6 +10,7 @@ UNIVERSES = {
     "NASDAQ100": "data/tickers_nasdaq100.csv",
     "INDICES": "data/tickers_indices.csv",
 }
+THRESHOLD_PCT = 5.0  # mostrar solo si está 5% o más por debajo de la SMA200
 
 def load_tickers(path="data/tickers.csv"):
     df = pd.read_csv(path)
@@ -81,7 +82,7 @@ def compute_under_sma200(px: pd.DataFrame) -> pd.DataFrame:
 
     # Delta / % bajo SMA200
     last["DeltaToSMA200"] = last["AdjClose"] - last["SMA200"]
-    last["BelowSMA200"] = last["AdjClose"] < last["SMA200"]
+    last["BelowThreshold"] = last["PctBelow"] < THRESHOLD_PCT
     last["PctBelow"] = (last["AdjClose"] / last["SMA200"] - 1.0) * 100
 
     # WeeklyMean: media semanal reciente (sobre últimas 200 sesiones)
@@ -98,7 +99,7 @@ def compute_under_sma200(px: pd.DataFrame) -> pd.DataFrame:
     last = last.merge(weekly_last, on="Ticker", how="left")
 
     # Nos quedamos solo con los que están bajo SMA200
-    under = last[last["BelowSMA200"]].copy()
+    under = last[last["BelowThreshold"]].copy()
     under = under.sort_values("PctBelow")  # más negativo primero
 
     # Columnas finales (ordenadas)
