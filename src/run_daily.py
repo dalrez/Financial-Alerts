@@ -138,6 +138,7 @@ def main():
         px = to_long_format(raw)
         # Guardar histórico para dashboard (últimos ~300 días de mercado)
         px_out = px.sort_values(["Ticker", "Date"]).copy()
+        px_out = px_out.groupby("Ticker", group_keys=False).tail(400)
         px_out.to_csv(f"data/prices_{name}.csv", index=False)
         under = compute_under_sma200(px)
 
