@@ -136,6 +136,9 @@ def main():
         
         raw = download_prices(tickers)
         px = to_long_format(raw)
+        # Guardar histórico para dashboard (últimos ~300 días de mercado)
+        px_out = px.sort_values(["Ticker", "Date"]).copy()
+        px_out.to_csv(f"data/prices_{name}.csv", index=False)
         under = compute_under_sma200(px)
 
         # --- Nombres con prioridad ---
