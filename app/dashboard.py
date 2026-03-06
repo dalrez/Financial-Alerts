@@ -258,17 +258,27 @@ with tab3:
 
     # Selector de ticker (y nombre si existe)
     if "Name" in df.columns:
-        # Creamos etiqueta "TICKER — Name" para elegir más cómodo
         label_map = {}
         for _, r in df[["Ticker", "Name"]].drop_duplicates().iterrows():
             t = str(r["Ticker"])
             n = str(r.get("Name", "")).strip()
-            label_map[t] = f"{t} — {n}" if n else t
+            # SOLO nombre; si no hay nombre, cae a ticker
+            label_map[t] = n if n else t
 
         tickers_available = sorted(hist["Ticker"].dropna().unique().tolist())
         options = [label_map.get(t, t) for t in tickers_available]
-        # hacemos mapping inverso
-        inv = {label_map.get(t, t): t for t in tickers_available}
+
+        # mapping inverso seguro (si hubiera nombres duplicados, añadimos el ticker)
+        inv = {}
+        options_unique = []
+        for t in tickers_available:
+            label = label_map.get(t, t)
+            if label in inv:  # nombre duplicado
+                label = f"{label} ({t})"
+            inv[label] = t
+            options_unique.append(label)
+        
+        options = options_unique
 
         preferred_ticker = "^GSPC"
         
@@ -298,12 +308,21 @@ with tab3:
     last_n = st.slider("Días a mostrar", min_value=60, max_value=400, value=260, step=20)
     s_plot = s.tail(last_n).copy()
 
+    # Nombre para mostrar en el título (si existe en df)
+    display_name = ticker
+    if "Name" in df.columns:
+        m = df[df["Ticker"].astype(str) == str(ticker)]
+        if not m.empty:
+            n = str(m.iloc[0].get("Name", "")).strip()
+            if n:
+                display_name = n  # solo nombre
+                
     # Gráfico
     fig = px.line(
         s_plot,
         x="Date",
         y=["AdjClose", "SMA200"],
-        title=f"{ticker} — Precio vs SMA200 ({universe})",
+        title=f"{display_name} — Precio vs SMA200 ({universe})",
     )
     fig.update_yaxes(title_text="Precio")
     fig.update_xaxes(title_text="")
