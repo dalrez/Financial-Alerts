@@ -35,13 +35,15 @@ if df.empty:
     st.info("No hay valores bajo SMA200 (según la lista actual).")
     st.stop()
 
-# --- Selector de universo ---
-if "Universe" in df.columns:
-    universe = st.selectbox("Universo", ["Todos"] + sorted(df["Universe"].dropna().unique().tolist()))
-    if universe != "Todos":
-        df = df[df["Universe"] == universe].copy()
-else:
-    universe = "Todos"
+# --- Selector de universo (por defecto INDICES) ---
+options = ["Todos"] + sorted(df["Universe"].dropna().unique().tolist())
+
+preferred_universe = "INDICES"
+default_idx = options.index(preferred_universe) if preferred_universe in options else 0
+
+universe = st.selectbox("Universo", options, index=default_idx)
+if universe != "Todos":
+    df = df[df["Universe"] == universe].copy()
     
 # --- Slider para el % ---
 threshold = st.sidebar.slider("Umbral (% bajo SMA200)", min_value=-30, max_value=5, value=-5, step=1)
@@ -258,7 +260,15 @@ with tab3:
         # hacemos mapping inverso
         inv = {label_map.get(t, t): t for t in tickers_available}
 
-        chosen_label = st.selectbox("Ticker", options)
+        preferred_ticker = "^GSPC"
+        
+        # etiqueta preferida (con nombre si existe)
+        preferred_label = label_map.get(preferred_ticker, preferred_ticker)
+        
+        # índice por defecto en el selectbox
+        default_index = options.index(preferred_label) if preferred_label in options else 0
+        
+        chosen_label = st.selectbox("Ticker", options, index=default_index)
         ticker = inv[chosen_label]
     else:
         ticker = st.selectbox("Ticker", sorted(hist["Ticker"].dropna().unique().tolist()))
@@ -296,4 +306,4 @@ with tab3:
         pct = (last["AdjClose"] / sma - 1) * 100
         st.caption(f"Último: {last['AdjClose']:.2f} | SMA200: {sma:.2f} | % vs SMA200: {pct:.2f}%")
 
-st.caption("Datos generados automáticamente por GitHub Actions. David Alvarez Ruiz")
+st.caption("Realizado por David Álvarez Ruiz")
