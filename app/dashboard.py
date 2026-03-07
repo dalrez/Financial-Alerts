@@ -132,9 +132,12 @@ st.divider()
 tab1, tab2, tab3 = st.tabs(["Tabla", "Gráfico", "Detalle"])
 
 with tab1:
-    st.subheader("Listado (ordenado por % vs SMA200)")
+    st.subheader("Listado (tabla pro)")
 
-    # Partimos de table_view (returns/vol ya en % si lo estás haciendo)
+    from st_aggrid import AgGrid, GridOptionsBuilder, JsCode
+    from st_aggrid.shared import GridUpdateMode
+
+    # Partimos de table_view (recomendado)
     pretty = table_view.copy()
 
     # Renombrar columnas a nombres humanos
@@ -167,7 +170,6 @@ with tab1:
         "Ret 21d", "Ret 63d", "Vol 20d (anual)",
         "% desde 52w Low", "% desde 52w High",
         "Pendiente SMA200 (20d)",
-        "Ret 5d", "Media semanal", "52w High", "52w Low",
     ]
     cols = [c for c in order if c in pretty.columns] + [c for c in pretty.columns if c not in order]
     pretty = pretty[cols]
@@ -176,62 +178,55 @@ with tab1:
     for c in pretty.select_dtypes(include="number").columns:
         pretty[c] = pretty[c].round(4)
 
-    # Column config (formatos)
-    colcfg = {}
+    # --- AgGrid options ---
+    gb = GridOptionsBuilder.from_dataframe(pretty)
+    gb.configure_default_column(
+        resizable=True, sortable=True, filter=True, floatingFilter=True, wrapText=True, autoHeight=True
+    )
 
-    def num_col(label, fmt="%.2f"):
-        return st.column_config.NumberColumn(label, format=fmt)
+    # Pinning de columnas clave
+    if "Ticker" in pretty.columns:
+        gb.configure_column("Ticker", pinned="left", width=110)
+    if "Nombre" in pretty.columns:
+        gb.configure_column("Nombre", pinned="left", width=260)
 
-    def pct_col(label):
-        return st.column_config.NumberColumn(label, format="%.2f%%")
-
-    # Formatos
-    if "Precio" in pretty.columns: colcfg["Precio"] = num_col("Precio", "%.2f")
-    if "SMA200" in pretty.columns: colcfg["SMA200"] = num_col("SMA200", "%.2f")
-    if "Δ vs SMA200" in pretty.columns: colcfg["Δ vs SMA200"] = num_col("Δ vs SMA200", "%.2f")
-    if "Media semanal" in pretty.columns: colcfg["Media semanal"] = num_col("Media semanal", "%.2f")
-    if "52w High" in pretty.columns: colcfg["52w High"] = num_col("52w High", "%.2f")
-    if "52w Low" in pretty.columns: colcfg["52w Low"] = num_col("52w Low", "%.2f")
-
-    for c in ["% vs SMA200", "Ret 5d", "Ret 21d", "Ret 63d", "Vol 20d (anual)", "% desde 52w High", "% desde 52w Low", "Pendiente SMA200 (20d)"]:
+    # Formatos numéricos
+    for c in ["Precio", "SMA200", "Δ vs SMA200", "Media semanal", "52w High", "52w Low"]:
         if c in pretty.columns:
-            colcfg[c] = pct_col(c)
+            gb.configure_column(c, type=["numericColumn"], valueFormatter="(params.value==null)?'':params.value.toFixed(2)")
 
-    # Coloreado de la columna "% vs SMA200" (más rojo cuanto más negativo)
-    # Si tu Streamlit no soporta Styler, hacemos fallback.
-    def shade_pct(v):
-        if pd.isna(v):
-            return ""
-        try:
-            v = float(v)
-        except Exception:
-            return ""
-        if v >= 0:
-            return ""
-        intensity = min(0.55, abs(v) / 20.0)  # -20% -> intensidad alta
-        return f"background-color: rgba(255, 0, 0, {intensity});"
+    # % columnas (ya están en % en pretty)
+    pct_cols = ["% vs SMA200", "Ret 5d", "Ret 21d", "Ret 63d", "Vol 20d (anual)", "% desde 52w High", "% desde 52w Low", "Pendiente SMA200 (20d)"]
+    for c in pct_cols:
+        if c in pretty.columns:
+            gb.configure_column(c, type=["numericColumn"], valueFormatter="(params.value==null)?'':params.value.toFixed(2) + '%'")
 
-    try:
-        if "% vs SMA200" in pretty.columns:
-            styled = pretty.style.applymap(shade_pct, subset=["% vs SMA200"])
-        else:
-            styled = pretty.style
+    # Colorear "% vs SMA200" (más rojo cuanto más negativo)
+    if "% vs SMA200" in pretty.columns:
+        cellstyle_jscode = JsCode("""
+        function(params) {
+            if (params.value == null) return {};
+            const v = params.value; // ya es porcentaje (ej: -7.2)
+            if (v >= 0) return {};
+            const intensity = Math.min(0.55, Math.abs(v) / 20.0);
+            return { 'backgroundColor': `rgba(255, 0, 0, ${intensity})` };
+        }
+        """)
+        gb.configure_column("% vs SMA200", cellStyle=cellstyle_jscode)
 
-        st.dataframe(
-            styled,
-            use_container_width=True,
-            height=560,
-            column_config=colcfg,
-            hide_index=True,
-        )
-    except Exception:
-        st.dataframe(
-            pretty,
-            use_container_width=True,
-            height=560,
-            column_config=colcfg,
-            hide_index=True,
-        )
+    # Altura y paginación
+    gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=25)
+
+    gridOptions = gb.build()
+
+    AgGrid(
+        pretty,
+        gridOptions=gridOptions,
+        update_mode=GridUpdateMode.NO_UPDATE,
+        fit_columns_on_grid_load=True,
+        height=560,
+        theme="streamlit",
+    )
 with tab2:
     st.subheader("Ranking (% bajo SMA200)")
 
