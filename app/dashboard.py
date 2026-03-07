@@ -41,7 +41,7 @@ options = ["Todos"] + sorted(df["Universe"].dropna().unique().tolist())
 preferred_universe = "INDICES"
 default_idx = options.index(preferred_universe) if preferred_universe in options else 0
 
-universe = st.selectbox("Universo", options, index=default_idx)
+universe = st.selectbox("Seleccione el mercado", options, index=default_idx)
 if universe != "Todos":
     df = df[df["Universe"] == universe].copy()
     
