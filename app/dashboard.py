@@ -190,6 +190,9 @@ with tab1:
         autoHeight=True,
     )
 
+    # Selección de fila
+    gb.configure_selection(selection_mode="single", use_checkbox=False)
+
     # Fijar columnas clave
     if "Ticker" in pretty.columns:
         gb.configure_column("Ticker", pinned="left", width=110)
@@ -207,7 +210,7 @@ with tab1:
                 valueFormatter="(params.value==null)?'':params.value.toFixed(2)"
             )
 
-    # % columnas (ya están en % en pretty / table_view)
+    # % columnas (ya están en % en table_view/pretty)
     pct_cols = ["% vs SMA200", "Ret 5d", "Ret 21d", "Ret 63d", "Vol 20d (anual)",
                 "% desde 52w High", "% desde 52w Low", "Pendiente SMA200 (20d)"]
     for c in pct_cols:
@@ -234,14 +237,22 @@ with tab1:
     max_h = 720
     grid_height = min(max_h, max(min_h, header_px + n * row_px))
 
-    AgGrid(
+    grid = AgGrid(
         pretty,
         gridOptions=gridOptions,
-        update_mode=GridUpdateMode.NO_UPDATE,
+        update_mode=GridUpdateMode.SELECTION_CHANGED,
         fit_columns_on_grid_load=True,
         height=grid_height,
         theme="streamlit",
     )
+
+    selected = grid.get("selected_rows", [])
+    if selected:
+        row = selected[0]
+        if "Ticker" in row and row["Ticker"]:
+            st.session_state["selected_ticker"] = str(row["Ticker"]).strip()
+            st.caption(f"Seleccionado: **{st.session_state['selected_ticker']}** → ve a la pestaña **Detalle**")
+            
 with tab2:
     st.subheader("Ranking (% bajo SMA200)")
 
@@ -305,8 +316,7 @@ with tab2:
 with tab3:
     st.subheader("Detalle: precio vs SMA200")
 
-    # Intentamos cargar el histórico del universo seleccionado
-    # Si elegiste "Todos", te obligo a elegir uno concreto para el histórico
+    # Si elegiste "Todos", obligamos a elegir uno concreto para el histórico
     if universe == "Todos":
         st.info("Selecciona un universo concreto arriba para ver el histórico.")
         st.stop()
@@ -323,18 +333,19 @@ with tab3:
         st.info("Histórico vacío.")
         st.stop()
 
-    # --- Selector de ticker: SOLO NOMBRE (usando cache y CSV de índices) ---
+    # Preferido por defecto: el seleccionado en tabla, si no ^GSPC
+    preferred_ticker = st.session_state.get("selected_ticker", "^GSPC")
+
     tickers_available = sorted(hist["Ticker"].dropna().astype(str).unique().tolist())
     if not tickers_available:
         st.info("No hay tickers en el histórico.")
         st.stop()
-    
-    # Construimos un mapa Ticker -> Name desde:
+
+    # Construimos mapa Ticker -> Name desde:
     # 1) names_cache.csv (yfinance)
     # 2) tickers_indices.csv (manual) con prioridad
     name_map = {}
-    
-    # 1) Cache yfinance
+
     try:
         nc = pd.read_csv("data/names_cache.csv")
         if "Ticker" in nc.columns and "Name" in nc.columns:
@@ -343,72 +354,57 @@ with tab3:
             name_map.update(dict(zip(nc["Ticker"], nc["Name"])))
     except FileNotFoundError:
         pass
-    
-    # 2) Nombres manuales de índices (prioridad)
+
     try:
         idx = pd.read_csv("data/tickers_indices.csv")
         if "Ticker" in idx.columns and "Name" in idx.columns:
             idx["Ticker"] = idx["Ticker"].astype(str).str.strip().str.upper()
             idx["Name"] = idx["Name"].astype(str).fillna("").str.strip()
-            # pisa lo anterior si hay coincidencias
-            name_map.update(dict(zip(idx["Ticker"], idx["Name"])))
+            name_map.update(dict(zip(idx["Ticker"], idx["Name"])))  # prioridad
     except FileNotFoundError:
         pass
-    
-    # Labels: solo nombre; si falta, caemos a ticker
+
+    # Labels: solo nombre; si falta, caemos a ticker; evitamos colisiones
     labels = []
     inv = {}
     for t in tickers_available:
         t_norm = str(t).strip().upper()
         label = name_map.get(t_norm, "").strip()
         if not label:
-            label = t_norm  # fallback si no hay nombre
-    
-        # Evitar colisiones si dos nombres iguales
+            label = t_norm
         if label in inv:
             label = f"{label} ({t_norm})"
-    
         inv[label] = t_norm
         labels.append(label)
-    
-    # Preferido por defecto: ^GSPC (si existe)
-    preferred_ticker = "^GSPC"
-    preferred_label = None
-    if preferred_ticker in tickers_available:
-        nm = name_map.get(preferred_ticker, "").strip()
-        preferred_label = nm if nm else preferred_ticker
-    
-    default_index = labels.index(preferred_label) if preferred_label in labels else 0
-    
+
+    # índice por defecto según ticker preferido
+    preferred_label = name_map.get(preferred_ticker, "").strip() or preferred_ticker
+    if preferred_label in inv:
+        default_index = labels.index(preferred_label)
+    else:
+        # fallback: si el preferido no está en este universo, el primero
+        default_index = 0
+
     chosen_label = st.selectbox("Nombre", labels, index=default_index)
     ticker = inv[chosen_label]
 
-
-    # Filtramos serie
-    s = hist[hist["Ticker"] == ticker].sort_values("Date").copy()
+    # Serie del ticker
+    s = hist[hist["Ticker"].astype(str).str.upper() == ticker].sort_values("Date").copy()
     if s.empty:
         st.info("No hay datos para ese ticker.")
         st.stop()
 
-    # Calculamos SMA200 para el gráfico (sobre el histórico)
+    # SMA200
     s["AdjClose"] = pd.to_numeric(s["AdjClose"], errors="coerce")
     s = s.dropna(subset=["AdjClose"]).copy()
     s["SMA200"] = s["AdjClose"].rolling(200).mean()
 
-    # Mostramos últimos N puntos (ajustable)
     last_n = st.slider("Días a mostrar", min_value=60, max_value=400, value=260, step=20)
     s_plot = s.tail(last_n).copy()
 
-    # Nombre para mostrar en el título (si existe en df)
-    display_name = ticker
-    if "Name" in df.columns:
-        m = df[df["Ticker"].astype(str) == str(ticker)]
-        if not m.empty:
-            n = str(m.iloc[0].get("Name", "")).strip()
-            if n:
-                display_name = n  # solo nombre
-                
-    # Gráfico
+    # Nombre para mostrar en el título (solo nombre)
+    display_name = name_map.get(ticker, "").strip() or ticker
+
     fig = px.line(
         s_plot,
         x="Date",
@@ -419,11 +415,11 @@ with tab3:
     fig.update_xaxes(title_text="")
     st.plotly_chart(fig, use_container_width=True)
 
-    # KPIs rápidos del ticker
+    # KPI del ticker
     last = s.iloc[-1]
     sma = last.get("SMA200")
     if pd.notna(sma) and sma != 0:
         pct = (last["AdjClose"] / sma - 1) * 100
         st.caption(f"Último: {last['AdjClose']:.2f} | SMA200: {sma:.2f} | % vs SMA200: {pct:.2f}%")
-
+        
 st.caption("Realizado por David Álvarez Ruiz")
