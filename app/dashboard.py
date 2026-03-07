@@ -240,7 +240,7 @@ with tab1:
     # --- Fix: primer render de AgGrid a veces calcula mal el ancho ---
     if "aggrid_warmup_done" not in st.session_state:
         st.session_state["aggrid_warmup_done"] = True
-        st.experimental_rerun()
+        st.rerun()
     
     grid = AgGrid(
         pretty,
