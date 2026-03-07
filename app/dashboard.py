@@ -261,6 +261,7 @@ with tab1:
         
     if row and "Ticker" in row and row["Ticker"]:
         st.session_state["selected_ticker"] = str(row["Ticker"]).strip()
+        st.session_state["selected_row"] = row  # <-- guardamos la fila completa
         st.caption(f"Seleccionado: **{st.session_state['selected_ticker']}** → ve a la pestaña **Detalle**")
             
 with tab2:
@@ -397,6 +398,83 @@ with tab3:
 
     chosen_label = st.selectbox("Nombre", labels, index=default_index)
     ticker = inv[chosen_label]
+
+    # --- KPIs (siempre se actualizan con el selector de Detalle) ---
+    
+    import math
+    
+    def _fmt_num(x, decimals=2):
+        try:
+            return f"{float(x):.{decimals}f}"
+        except Exception:
+            return "—"
+    
+    def _fmt_pct(x):
+        try:
+            v = float(x)
+            # si viene en decimal (0.05) lo pasamos a %
+            v = v * 100 if abs(v) < 2 else v
+            return f"{v:.2f}%"
+        except Exception:
+            return "—"
+    
+    # 1) Intentamos sacar métricas del df del universo (df ya está filtrado por universe arriba)
+    row_today = None
+    if "Ticker" in df.columns and len(df) > 0:
+        m = df[df["Ticker"].astype(str).str.strip().str.upper() == str(ticker).strip().upper()]
+        if not m.empty:
+            row_today = m.iloc[0]
+    
+    # KPIs base (preferimos df si existe)
+    precio = row_today.get("AdjClose") if row_today is not None and "AdjClose" in row_today else None
+    sma200 = row_today.get("SMA200") if row_today is not None and "SMA200" in row_today else None
+    pct_vs = row_today.get("PctBelow") if row_today is not None and "PctBelow" in row_today else None
+    ret21 = row_today.get("Return_21d") if row_today is not None and "Return_21d" in row_today else None
+    vol20 = row_today.get("Vol_20d") if row_today is not None and "Vol_20d" in row_today else None
+    
+    # 2) Fallback: calcular desde histórico si faltan
+    h = hist[hist["Ticker"].astype(str).str.strip().str.upper() == str(ticker).strip().upper()].sort_values("Date").copy()
+    if not h.empty:
+        h["AdjClose"] = pd.to_numeric(h["AdjClose"], errors="coerce")
+        h = h.dropna(subset=["AdjClose"]).copy()
+    
+        if len(h) >= 1:
+            last_price = float(h.iloc[-1]["AdjClose"])
+            if precio is None:
+                precio = last_price
+    
+        # SMA200 y % vs SMA200 desde histórico
+        if len(h) >= 200:
+            sma_series = h["AdjClose"].rolling(200).mean()
+            last_sma = float(sma_series.iloc[-1])
+            if sma200 is None:
+                sma200 = last_sma
+            if pct_vs is None and last_sma != 0:
+                pct_vs = (last_price / last_sma - 1) * 100
+    
+        # Return 21d desde histórico (21 sesiones)
+        if ret21 is None and len(h) >= 22:
+            p_now = float(h.iloc[-1]["AdjClose"])
+            p_21 = float(h.iloc[-22]["AdjClose"])  # 21 sesiones atrás (porque incluye hoy)
+            if p_21 != 0:
+                ret21 = (p_now / p_21) - 1.0  # decimal
+    
+        # Vol 20d anualizada desde histórico
+        if vol20 is None and len(h) >= 21:
+            # retornos diarios últimos 20 días
+            rets = h["AdjClose"].pct_change().dropna().tail(20)
+            if len(rets) >= 10:  # mínimo razonable para evitar ruido
+                vol20 = float(rets.std(ddof=0) * math.sqrt(252))  # decimal
+    
+    # Pintamos KPIs
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("Precio", _fmt_num(precio, 2))
+    c2.metric("SMA200", _fmt_num(sma200, 2))
+    c3.metric("% vs SMA200", _fmt_pct(pct_vs))
+    c4.metric("Ret 21d", _fmt_pct(ret21))
+    c5.metric("Vol 20d (anual)", _fmt_pct(vol20))
+    
+    st.divider()
 
     # Serie del ticker
     s = hist[hist["Ticker"].astype(str).str.upper() == ticker].sort_values("Date").copy()
