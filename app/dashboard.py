@@ -187,7 +187,7 @@ with tab1:
         filter=True,
         floatingFilter=True,
         wrapText=True,
-        autoHeight=True,
+        autoHeight=False,
     )
 
     # Selección de fila
@@ -237,6 +237,11 @@ with tab1:
     max_h = 720
     grid_height = min(max_h, max(min_h, header_px + n * row_px))
 
+    # --- Fix: primer render de AgGrid a veces calcula mal el ancho ---
+    if "aggrid_warmup_done" not in st.session_state:
+        st.session_state["aggrid_warmup_done"] = True
+        st.experimental_rerun()
+    
     grid = AgGrid(
         pretty,
         gridOptions=gridOptions,
