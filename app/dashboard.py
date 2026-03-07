@@ -132,49 +132,106 @@ st.divider()
 tab1, tab2, tab3 = st.tabs(["Tabla", "Gráfico", "Detalle"])
 
 with tab1:
-    st.subheader("Listado (ordenado por % bajo SMA200)")
+    st.subheader("Listado (ordenado por % vs SMA200)")
+
+    # Partimos de table_view (returns/vol ya en % si lo estás haciendo)
+    pretty = table_view.copy()
+
+    # Renombrar columnas a nombres humanos
+    rename = {
+        "RunDate": "Fecha",
+        "Universe": "Universo",
+        "Ticker": "Ticker",
+        "Name": "Nombre",
+        "AdjClose": "Precio",
+        "SMA200": "SMA200",
+        "DeltaToSMA200": "Δ vs SMA200",
+        "PctBelow": "% vs SMA200",
+        "WeeklyMean": "Media semanal",
+        "Return_5d": "Ret 5d",
+        "Return_21d": "Ret 21d",
+        "Return_63d": "Ret 63d",
+        "Vol_20d": "Vol 20d (anual)",
+        "52wHigh": "52w High",
+        "52wLow": "52w Low",
+        "PctFrom52wHigh": "% desde 52w High",
+        "PctFrom52wLow": "% desde 52w Low",
+        "SMA200_Slope_20d": "Pendiente SMA200 (20d)",
+    }
+    pretty = pretty.rename(columns={k: v for k, v in rename.items() if k in pretty.columns})
+
+    # Orden recomendado
+    order = [
+        "Fecha", "Universo", "Ticker", "Nombre",
+        "Precio", "SMA200", "Δ vs SMA200", "% vs SMA200",
+        "Ret 21d", "Ret 63d", "Vol 20d (anual)",
+        "% desde 52w Low", "% desde 52w High",
+        "Pendiente SMA200 (20d)",
+        "Ret 5d", "Media semanal", "52w High", "52w Low",
+    ]
+    cols = [c for c in order if c in pretty.columns] + [c for c in pretty.columns if c not in order]
+    pretty = pretty[cols]
+
+    # Redondeo
+    for c in pretty.select_dtypes(include="number").columns:
+        pretty[c] = pretty[c].round(4)
+
+    # Column config (formatos)
     colcfg = {}
 
     def num_col(label, fmt="%.2f"):
         return st.column_config.NumberColumn(label, format=fmt)
-    
-    def pct_col(label):
-        # table_df tiene returns como decimal (0.05), esto lo muestra como 5.00%
-        return st.column_config.NumberColumn(label, format="%.2f%%")
-    
-    # Formatos de precio
-    if "AdjClose" in table_df.columns: colcfg["AdjClose"] = num_col("Precio", "%.2f")
-    if "SMA200" in table_df.columns: colcfg["SMA200"] = num_col("SMA200", "%.2f")
-    if "DeltaToSMA200" in table_df.columns: colcfg["DeltaToSMA200"] = num_col("Δ vs SMA200", "%.2f")
-    if "WeeklyMean" in table_df.columns: colcfg["WeeklyMean"] = num_col("Media semanal", "%.2f")
-    if "52wHigh" in table_df.columns: colcfg["52wHigh"] = num_col("52w High", "%.2f")
-    if "52wLow" in table_df.columns: colcfg["52wLow"] = num_col("52w Low", "%.2f")
-    
-    # % (decimales -> % en pantalla)
-    for c, label in [
-        ("PctBelow", "% vs SMA200"),
-        ("Return_5d", "Ret 5d"),
-        ("Return_21d", "Ret 21d"),
-        ("Return_63d", "Ret 63d"),
-        ("Vol_20d", "Vol 20d (anual)"),
-        ("PctFrom52wHigh", "% desde 52w High"),
-        ("PctFrom52wLow", "% desde 52w Low"),
-    ]:
-        if c in table_df.columns:
-            colcfg[c] = pct_col(label)
-    
-    # Ojo: SMA200_Slope_20d ya está en % (porque lo calculamos *100)
-    # Así que lo formateamos como número normal con símbolo %
-    if "SMA200_Slope_20d" in table_df.columns:
-        colcfg["SMA200_Slope_20d"] = st.column_config.NumberColumn("Pendiente SMA200 (20d)", format="%.2f%%")
-    
-    st.dataframe(
-        table_view,
-        use_container_width=True,
-        height=520,
-        column_config=colcfg,
-    )
 
+    def pct_col(label):
+        return st.column_config.NumberColumn(label, format="%.2f%%")
+
+    # Formatos
+    if "Precio" in pretty.columns: colcfg["Precio"] = num_col("Precio", "%.2f")
+    if "SMA200" in pretty.columns: colcfg["SMA200"] = num_col("SMA200", "%.2f")
+    if "Δ vs SMA200" in pretty.columns: colcfg["Δ vs SMA200"] = num_col("Δ vs SMA200", "%.2f")
+    if "Media semanal" in pretty.columns: colcfg["Media semanal"] = num_col("Media semanal", "%.2f")
+    if "52w High" in pretty.columns: colcfg["52w High"] = num_col("52w High", "%.2f")
+    if "52w Low" in pretty.columns: colcfg["52w Low"] = num_col("52w Low", "%.2f")
+
+    for c in ["% vs SMA200", "Ret 5d", "Ret 21d", "Ret 63d", "Vol 20d (anual)", "% desde 52w High", "% desde 52w Low", "Pendiente SMA200 (20d)"]:
+        if c in pretty.columns:
+            colcfg[c] = pct_col(c)
+
+    # Coloreado de la columna "% vs SMA200" (más rojo cuanto más negativo)
+    # Si tu Streamlit no soporta Styler, hacemos fallback.
+    def shade_pct(v):
+        if pd.isna(v):
+            return ""
+        try:
+            v = float(v)
+        except Exception:
+            return ""
+        if v >= 0:
+            return ""
+        intensity = min(0.55, abs(v) / 20.0)  # -20% -> intensidad alta
+        return f"background-color: rgba(255, 0, 0, {intensity});"
+
+    try:
+        if "% vs SMA200" in pretty.columns:
+            styled = pretty.style.applymap(shade_pct, subset=["% vs SMA200"])
+        else:
+            styled = pretty.style
+
+        st.dataframe(
+            styled,
+            use_container_width=True,
+            height=560,
+            column_config=colcfg,
+            hide_index=True,
+        )
+    except Exception:
+        st.dataframe(
+            pretty,
+            use_container_width=True,
+            height=560,
+            column_config=colcfg,
+            hide_index=True,
+        )
 with tab2:
     st.subheader("Ranking (% bajo SMA200)")
 
