@@ -215,16 +215,28 @@ with tab1:
         gb.configure_column("% vs SMA200", cellStyle=cellstyle_jscode)
 
     # Altura y paginación
-    gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=25)
+    if n <= 25:
+        gb.configure_pagination(enabled=False)
+    else:
+        gb.configure_pagination(paginationAutoPageSize=False, paginationPageSize=25)
 
     gridOptions = gb.build()
+
+    # Altura dinámica: se ajusta al nº de filas
+    n = len(pretty)
+    header_px = 85      # cabecera + filtros
+    row_px = 32         # alto aproximado por fila
+    min_h = 220
+    max_h = 720
+
+    grid_height = min(max_h, max(min_h, header_px + n * row_px))
 
     AgGrid(
         pretty,
         gridOptions=gridOptions,
         update_mode=GridUpdateMode.NO_UPDATE,
         fit_columns_on_grid_load=True,
-        height=560,
+        height=grid_height,
         theme="streamlit",
         allow_unsafe_jscode=True,
     )
