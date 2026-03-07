@@ -226,6 +226,7 @@ with tab1:
         fit_columns_on_grid_load=True,
         height=560,
         theme="streamlit",
+        allow_unsafe_jscode=True,
     )
 with tab2:
     st.subheader("Ranking (% bajo SMA200)")
